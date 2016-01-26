@@ -8,7 +8,7 @@ function fig3()
     bem.Nx = 292; bem.Ny = 292;
     bem.deg_per_pixel = 0.03;    
     bem.dx = 0.09;
-    bem=bem.rescale(0.5);    
+    bem=bem.rescale(0.5);
     
     bem = bem.update();   
 
