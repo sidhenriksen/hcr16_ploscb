@@ -3,9 +3,9 @@ clear all;
 %% Define run-time parameters
 % If you want to save the responses to disk (note: this takes up some
 % space)
-run_bootstrap = 0;
+run_bootstrap = 1;
 bootstrap_mode = 1;
-build_bootstrap_arrays = 1;
+build_bootstrap_arrays = 0;
 
 scaling_factor=1;
 
@@ -21,7 +21,7 @@ bem.outputNL = @(x)(x.^2); % squaring output nonlinearity
 % Set temporal properties of bem unit
 bem.tk.tau = 0.035;
 bem.tk.omega = 4;
-bem.dt=1/(85*2);
+bem.dt=1/1000;
  
 
 f = 0.3125; % cycles per SD
@@ -95,7 +95,7 @@ if run_bootstrap
             if n_temp < n_bootstrap
                 Nb = n_bootstrap-n_temp;
                 
-                % This guarantees that they see the same image sequence
+                % the seed guarantees that they see the same image sequences
                 seed = randi(1e9,1);
                 fine_far_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel,seed);
                 fine_near_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel,seed);
@@ -103,21 +103,8 @@ if run_bootstrap
                 coarse_near_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel,seed);
             end
         end
-        
     end
 end
-
-% Run normalisation if normailsation constant is already computed
-run_norm = ~fine_far_bem.check_normalization_constant(rds);
-if run_norm;
-    fprintf('Calculating normalisation constants... ');
-    fine_far_bem = fine_far_bem.compute_normalization_constant(rds,0,bootstrap_mode);
-    fine_near_bem = fine_near_bem.compute_normalization_constant(rds,0,bootstrap_mode);
-    coarse_near_bem = coarse_near_bem.compute_normalization_constant(rds,0,bootstrap_mode);
-    coarse_far_bem = coarse_far_bem.compute_normalization_constant(rds,0,bootstrap_mode);
-    fprintf('Done.\n');
-end
-
 
 
 %% Build bootstrap arrays
@@ -134,7 +121,7 @@ end
 % data.
 n_bootstrap_trials = 1e4; % number of samples in bootstrap distribution
 conditions = CombVec(freqs,correlation_levels,dxs);
-noise_levels = [0,linspace(5,30,41)];
+noise_levels = [0,linspace(30,100,40)];
 
 n_bootstrap=2e4;
 if build_bootstrap_arrays
@@ -155,7 +142,9 @@ if build_bootstrap_arrays
         rds.dx = dx;
         
         
-                      
+        % these indices ensure that the only difference between near and
+        % far cells (neuron-antineuron pairs) is the difference in
+        % disparity
         fine_indices = randi(n_bootstrap,1,n_frames*n_bootstrap_trials);
         fine_indices = reshape(fine_indices,[n_frames,n_bootstrap_trials]);
         
@@ -222,20 +211,23 @@ if build_bootstrap_arrays
         
     end
 
-    %save('fig7_v5_bootstrap_data.mat','ff_resp','fn_resp','cf_resp','cn_resp')
+    save('fig6_bootstrap_data.mat','ff_resp','fn_resp','cf_resp','cn_resp')
 else
-    %load('fig7_v5_bootstrap_data.mat');
+    load('fig6_bootstrap_data.mat');
 end
 
-all_n_cells = 50; all_ps = 0.4;
 
-N = 1e3;
+
+
+all_n_cells = [40]; all_ps = [1.0];
+
+N = 5e3;
 
 
 %% Run the decision model
 fprintf('Running conditions...')
 sub_dims = [length(freqs),length(correlation_levels),length(dxs)];
-Psi = zeros([length(all_ps),length(all_n_cells),length(noise_levels),sub_dims]);
+Psi = zeros([length(all_n_cells),length(noise_levels),sub_dims]);
 for j = 1:size(conditions,2);   
     [f,g,k] = ind2sub(sub_dims,j);
 
@@ -248,31 +240,25 @@ for j = 1:size(conditions,2);
         current_cn = squeeze(cn_resp(j,:,n_i));
 
         for nk = 1:length(all_n_cells);
-            for p_i = 1:length(all_ps);
-                p = all_ps(p_i);
-                n_cells = all_n_cells(nk);
-                K = round(2*n_cells*p);
+
+            n_cells = all_n_cells(nk);
 
 
-                idx = randi(length(current_ff),[n_cells,N]);
-                ff = current_ff(idx) - current_fn(idx);                        
-                fn = -ff;
 
-                idx = randi(length(current_ff),[n_cells,N]);            
-                cf = current_cf(idx) - current_cn(idx);            
-                cn = -cf;
+            idx = randi(length(current_ff),[n_cells,N]);
+            ff = current_ff(idx) - current_fn(idx);                        
+            fn = -ff;
 
-                near = [fn;cn];
-                far = [ff;cf];
+            idx = randi(length(current_ff),[n_cells,N]);            
+            cf = current_cf(idx) - current_cn(idx);            
+            cn = -cf;
 
-                near_sorted = sort(near,'descend');            
-                far_sorted = sort(far,'descend');
+            near = [fn;cn];
 
-                psi = sum(near_sorted(1:K,:)) > sum(far_sorted(1:K,:));
+            psi = sum(near) > 0;
 
-
-                Psi(p_i,nk,n_i,f,g,k) = mean(psi);
-            end
+            Psi(nk,n_i,f,g,k) = mean(psi);
+            
         end
     end
 end
@@ -299,25 +285,23 @@ n_conds = length(noise_levels)*length(all_n_cells);
 allSS = zeros(1,n_conds);
 for n_i = 1:length(noise_levels);
     for nk = 1:length(all_n_cells);
-        for p_i = 1:length(all_ps);
 
-            j = sub2ind(dims(1:3),p_i,nk,n_i);
+        j = sub2ind(dims(1:2),nk,n_i);
 
-            temp_Psi = squeeze(Psi(p_i,nk,n_i,:,:,:));
-            current_Psi(:,1,:) = (temp_Psi(:,:,2)+(1-temp_Psi(:,:,3)))'/2;
-            current_Psi(:,2,:) = (temp_Psi(:,:,1)+(1-temp_Psi(:,:,4)))'/2;
-            obs_dx(2,:) = current_Psi(:,1,2);
-            obs_dx(1,:) = current_Psi(:,2,2);
-            obs_hz(1,:) = current_Psi(:,1,1);
-            obs_hz(2,:) = current_Psi(:,1,3);
-            SS = sum(abs((obs_dx(:)-doi_dx(:))).^1.0) + ...
-                 sum(abs((obs_hz(:)-doi_hz(:))).^1.0);
-             
-             diff_ac = 15*(obs_hz(1,1)-obs_hz(2,1)).^2;
-             diff_dx = 15*(obs_dx(1,1)-0.2).^2;
+        temp_Psi = squeeze(Psi(nk,n_i,:,:,:));
+        current_Psi(:,1,:) = (temp_Psi(:,:,2)+(1-temp_Psi(:,:,3)))'/2;
+        current_Psi(:,2,:) = (temp_Psi(:,:,1)+(1-temp_Psi(:,:,4)))'/2;
+        obs_dx(2,:) = current_Psi(:,1,2);
+        obs_dx(1,:) = current_Psi(:,2,2);
+        obs_hz(1,:) = current_Psi(:,1,1);
+        obs_hz(2,:) = current_Psi(:,1,3);
+        SS = sum(abs((obs_dx(:)-doi_dx(:))).^1.0) + ...
+             sum(abs((obs_hz(:)-doi_hz(:))).^1.0);
 
-            allSS(j) = SS+diff_ac;
-        end
+         diff_ac = 15*(obs_hz(1,1)-obs_hz(2,1)).^2;
+         diff_dx = 15*(obs_dx(1,1)-0.2).^2;
+
+        allSS(j) = SS+diff_ac;
         
     end
 end
@@ -326,18 +310,15 @@ end
 [~,idxs] = sort(allSS);
 
 
+k=1;
+[i,j] = ind2sub([length(all_n_cells),length(noise_levels)],idxs(k));
 
+%i =1; k = 6;
 
-%    [p_i,i,j] = ind2sub([length(all_ps),length(all_n_cells),length(noise_levels)],idxs(k));
-i = 1; j = 20;
-p_i = 1;
-
-        
-    
 
 clear PsiM
-PsiM(:,:,:,2) = squeeze(Psi(p_i,i,:,:,:,1)+(1-Psi(p_i,i,:,:,:,4)))/2;
-PsiM(:,:,:,1) = squeeze(Psi(p_i,i,:,:,:,2)+(1-Psi(p_i,i,:,:,:,3)))/2;
+PsiM(:,:,:,2) = squeeze(Psi(i,:,:,:,1)+(1-Psi(i,:,:,:,4)))/2;
+PsiM(:,:,:,1) = squeeze(Psi(i,:,:,:,2)+(1-Psi(i,:,:,:,3)))/2;
 brown = [0.6,0.3,0.1];
 %
 
@@ -390,13 +371,6 @@ set_plot_params(gcf);
 
 
 
-
-% 
-%     subplot(1,2,1);
-%     title(sprintf('ncells: %i (%i); noise %.2f (%i)',all_n_cells(i),i,noise_levels(j),j))
-%     subplot(1,2,2);
-%     title(sprintf('p=%.2f',p));
-
 A_dx = [fractional_area(fit_fine),fractional_area(fit_coarse)];
 a = figure(); hold on;    
 plot([0.03,0.48],A_dx,'k o -','markerfacecolor','k','linewidth',2,...
@@ -404,8 +378,8 @@ plot([0.03,0.48],A_dx,'k o -','markerfacecolor','k','linewidth',2,...
 
 xlabel('\Deltax');
 ylabel(sprintf('Fractional\n area'));
-ylim([0.0,1.0]); xlim([0,0.55]);
-set(gca,'ytick',0:0.5:1,'xtick',[0.05,0.5]);
+ylim([0.0,1.0]); xlim([0.03-0.05,0.48+0.05]);
+set(gca,'ytick',0:0.5:1,'xtick',[0.03,0.48]);
 
 %set_plot_params(a);
 
@@ -427,8 +401,8 @@ plot([85/16,85/2],A_hz,'k o -','markerfacecolor','k','linewidth',2,...
 
 xlabel('Hz');
 ylabel(sprintf('Fractional\n area'));
-ylim([0.15,0.45]); 
-set(gca,'ytick',[0.2,0.3,0.4],'xtick',round([85/16,85/2],2),'xscale','linear');
+ylim([0.2,0.5]); 
+set(gca,'ytick',[0.2,0.35,0.5],'xtick',round([85/16,85/2],2),'xscale','linear');
 xlim([0,85/2+85/16])
 %set_plot_params(a);
 
@@ -438,5 +412,3 @@ new_handle = copyobj(inset_handle,fig);
 close(a);
 ax=get(sub2,'Position');
 set(new_handle,'Position',[1.2*ax(1)+ax(3)-inset_size 0.1*ax(2)+ax(4)-inset_size inset_size*0.5 inset_size])
-
-

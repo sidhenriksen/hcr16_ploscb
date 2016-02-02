@@ -4,8 +4,9 @@ clear all;
 % If you want to save the responses to disk (note: this takes up some
 % space)
 run_bootstrap = 0;
-bootstrap_mode = 1;
 build_bootstrap_arrays = 1;
+bootstrap_mode = 1;
+
 
 
 %% Define the parameters of the mother BEMunit; all the other energy model
@@ -20,6 +21,7 @@ bem.outputNL = @(x)(x.^2); % squaring output nonlinearity
 % Set temporal properties of bem unit
 bem.tk.tau = 0.035;
 bem.tk.omega = 4;
+bem.dt = 0.001;
  
 
 f = 0.3125; % cycles per SD
@@ -106,7 +108,6 @@ if run_bootstrap
         
     end
 end
-
 
 %% Build bootstrap arrays
 % First we build the bootstrap arrays. We make the decision model by
@@ -207,9 +208,9 @@ end
 
 
 
-n_cells = [50]; p = 0.4;
+n_cells = 40; 
 
-N = 1000;
+N = 3e3;
 dims = size(ff_resp);
 
 
@@ -226,9 +227,7 @@ for j = 1:size(conditions,2);
         current_cn = squeeze(cn_resp(j,:,n_i));
         
         
-        [f,k] = ind2sub(sub_dims,j);
-        
-        K = round(2*n_cells*p);
+        [f,k] = ind2sub(sub_dims,j);        
 
         replace=1;
         ff = randsample(current_ff,n_cells*N,replace)-randsample(current_fn,n_cells*N,replace);
@@ -240,12 +239,9 @@ for j = 1:size(conditions,2);
         cn = -cf;
 
         near = [fn;cn];
-        far = [ff;cf];
-
-        near_sorted = sort(near,'descend');            
-        far_sorted = sort(far,'descend');
-
-        psi = sum(near_sorted(1:K,:)) > sum(far_sorted(1:K,:));
+        
+        psi = sum(near)>0;
+        
 
 
         Psi(n_i,f,k) = mean(psi);
@@ -259,9 +255,11 @@ PsiM = (Psi(:,:,1)+(1-Psi(:,:,2)))/2;
 figure();
 imagesc(PsiM);
 
+k = 9;
 fig = alternating_psych_analysis();
 subplot(1,2,1); hold on;
-plot(log(alternation_rates),PsiM(16,:),'o m -','linewidth',4,'markersize',10);
-
+a=plot(log(alternation_rates),PsiM(k,:),'o m -','linewidth',4,'markersize',10);
+children=get(gcf,'children');
+leg=children(1);
 subplot(1,2,2); hold on;
-plot(log(alternation_rates),PsiM(16,:),'o m -','linewidth',4,'markersize',10);
+plot(log(alternation_rates),PsiM(k,:),'o m -','linewidth',4,'markersize',10);

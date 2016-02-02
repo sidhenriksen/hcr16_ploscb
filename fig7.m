@@ -17,7 +17,7 @@ bem.outputNL = @(x)(x.^2); % squaring output nonlinearity
 % Set temporal properties of bem unit
 bem.tk.tau = 0.035;
 bem.tk.omega = 4;
-bem.dt=1/(85*2);
+bem.dt = 1/1000;
 
 
 f = 0.3125; % cycles per SD
@@ -109,9 +109,10 @@ if run_bootstrap
 end
 
 
+
 %%
 
-noise_levels = [0,linspace(5,30,41)];
+noise_levels = [0,linspace(10,50,30)];
 if build_arrays
     ff_resp = zeros(length(dotsizes),length(dxs),n_bootstrap_trials,length(noise_levels));
     fn_resp = zeros(length(dotsizes),length(dxs),n_bootstrap_trials,length(noise_levels));
@@ -119,6 +120,7 @@ if build_arrays
     cn_resp = zeros(length(dotsizes),length(dxs),n_bootstrap_trials,length(noise_levels));
     %%
     for ds = 1:length(dotsizes)
+        fprintf('Running dotsize %i of %i\n',ds,length(dotsizes));
         rds.dotsize = dotsizes(ds);
         crds.dotsize = dotsizes(ds);
         for i = 1:length(bems);
@@ -178,9 +180,7 @@ if build_arrays
 end
 
 %%
-n_cells = 50;
-p = 0.4;
-K = round(2*n_cells*p);
+n_cells = 40;
 
 Psi = zeros(length(dotsizes),length(dxs),length(noise_levels));
 N = 5e3;
@@ -202,13 +202,8 @@ for ds = 1:length(dotsizes);
             cn = -cf;
 
             near = [fn;cn];
-            far = [ff;cf];
-
-            near_sorted = sort(near,'descend');            
-            far_sorted = sort(far,'descend');
-
-            psi = sum(near_sorted(1:K,:)) > sum(far_sorted(1:K,:));
-
+            
+            psi = sum(near)>0;
 
             Psi(ds,k,n_i) = mean(psi);
         end
@@ -217,7 +212,7 @@ end
 
 
 %% Generate plots
-k=10;
+k=6;
 
 x = dotsizes*0.025;
 load('dotsize_data.mat');
@@ -239,21 +234,27 @@ plot([0,0.1],[0.5,0.5],'k --','linewidth',2);
 ylabel('Proportion correct');
 
 subplot(1,2,2);
+PsiM = (Psi(:,1,:) + (1-Psi(:,2,:)))/2;
 ExpN = 160;
 [Lexp,Uexp] = BinoConf_Score(P2m*ExpN,ExpN);
 Lexp = P2m-Lexp; Uexp = Uexp-P2m;
 hold on;
+
+plot(x,P2m,'k - o','markersize',7,'markerfacecolor','k','linewidth',2);
 plot(x,PsiM(:,k),'m o -','markersize',7,'markerfacecolor','m','linewidth',2);
-plot(x,P2m,'k -','markersize',7,'markerfacecolor','k','linewidth',2);
+L2=legend('Average of 4 subjects','Model');
 E1 = errorbar(x,P2m,Lexp,Uexp);
 set(E1,'color','k','markersize',7,'marker','o','linestyle','None',...
 'markerfacecolor','k','linewidth',3);
+
 xlim([0.015,0.085]); ylim([0,1]);
 set(gca,'xtick',x,'ytick',0:0.25:1);
 xlabel('Dot size (deg)');
 
-L2=legend('Model','Average of 4 subjects');
+
 set(L2,'location','southeast')
 plot([0,0.1],[0.5,0.5],'k --','linewidth',2);
 set_plot_params(gcf)
+
+savefig(gcf,'fig7.fig')
 %end
