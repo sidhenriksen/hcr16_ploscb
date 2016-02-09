@@ -1,16 +1,15 @@
 % This recreates Figure 7 from Henriksen, Cumming, & Read (2016)
 
-run_bootstrap = 0;
+run_bootstrap = 1;
 build_arrays = 1;
 bootstrap_mode = 1;
-scaling_factor=1;
 
 %% Define the parameters of the mother BEMunit; all the other energy model
 %% units are derived from this  mother unit.
 silent = 1;
-bem = BEMunit('silent',silent,'x0',0,'y0',0,'bootstrap_dir','/sid/Modelling/hcr16_ploscb/fig7_data/');
-bem.Nx = 292*scaling_factor; bem.Ny=292*scaling_factor;
-bem.deg_per_pixel = 0.03/scaling_factor;
+bem = BEMunit('silent',silent,'x0',0,'y0',0);
+bem.Nx = 292; bem.Ny=292;
+bem.deg_per_pixel = 0.03;
 bem.temporal_kernel = 'gamma-cosine';
 bem.outputNL = @(x)(x.^2); % squaring output nonlinearity
 
@@ -40,13 +39,18 @@ bem = bem.update();
 dx_to_sx = @(x)(0.023 + abs(x)*0.41);
 sx = bem.subunits(1).rf_params.left.sx;
 
+% The reason for this peculiar scaling is that the experiment was done with
+% dotsize multiples of 0.075. In our simulation, a pixel width is 0.03 deg,
+% so in order to get this to work, we rescale the RF slightly, such
+% that the model is effectively seeing dots with a raidus of 0.025 deg
+% rather than the 0.03 deg.
 fine_near_bem = bem; fine_near_bem.dx = -0.03;
 fine_sx = dx_to_sx(fine_near_bem.dx);
-fine_near_bem = fine_near_bem.rescale(fine_sx/sx * 0.09/0.075);
+fine_near_bem = fine_near_bem.rescale(fine_sx/sx * 0.03/0.025);
 
 coarse_near_bem = bem; coarse_near_bem.dx=-0.48;
 coarse_sx = dx_to_sx(coarse_near_bem.dx);
-coarse_near_bem = coarse_near_bem.rescale(coarse_sx/sx * 0.09/0.075);
+coarse_near_bem = coarse_near_bem.rescale(coarse_sx/sx * 0.03/0.025);
 
 % These are exactly the same except that their disparities are the opposite
 % sign.
@@ -61,7 +65,7 @@ coarse_far_bem = coarse_far_bem.update();
 
 
 %% Create stimulus generator object
-rds = pairedRDS(); rds.dotsize=3*scaling_factor;
+rds = pairedRDS(); rds.dotsize=3;
 rds.Nx = bem.Nx; rds.Ny = bem.Ny;
 rds.correlation = 0;
 crds = rds;
@@ -212,10 +216,10 @@ end
 
 
 %% Generate plots
-k=6;
+k=5;
 
 x = dotsizes*0.025;
-load('dotsize_data.mat');
+P = dotsize_psych_analysis();
 P2 = squeeze(P(1,1,:,:));
 cols = rand([3,size(P2,2)]);
 P2m = mean(P2,2);
@@ -240,12 +244,13 @@ ExpN = 160;
 Lexp = P2m-Lexp; Uexp = Uexp-P2m;
 hold on;
 
-plot(x,P2m,'k - o','markersize',7,'markerfacecolor','k','linewidth',2);
-plot(x,PsiM(:,k),'m o -','markersize',7,'markerfacecolor','m','linewidth',2);
-L2=legend('Average of 4 subjects','Model');
 E1 = errorbar(x,P2m,Lexp,Uexp);
 set(E1,'color','k','markersize',7,'marker','o','linestyle','None',...
 'markerfacecolor','k','linewidth',3);
+a=plot(x,P2m,'k - o','markersize',7,'markerfacecolor','k','linewidth',2);
+b=plot(x,PsiM(:,k),'m o -','markersize',7,'markerfacecolor','m','linewidth',2);
+L2=legend([a,b],'Average of 4 subjects','Model');
+
 
 xlim([0.015,0.085]); ylim([0,1]);
 set(gca,'xtick',x,'ytick',0:0.25:1);

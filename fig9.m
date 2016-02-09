@@ -7,6 +7,7 @@ run_bootstrap = 0;
 build_bootstrap_arrays = 1;
 bootstrap_mode = 1;
 
+save_bootstrap_array = 0;
 
 
 %% Define the parameters of the mother BEMunit; all the other energy model
@@ -121,8 +122,8 @@ end
 % distribution. Once we've built the bootstrap arrays, we can quickly find 
 % the optimal number of cells + noise combination that fits the observed
 % data.
-M = 500; % number of trials per cell
-n_cells = 50; % number of cells
+M = 1e3; % number of trials per cell
+n_cells = 40; % number of cells
 conditions = CombVec(alternation_rates,dxs);
 
 noise_levels = [0,linspace(5,30,41)];
@@ -200,7 +201,9 @@ if build_bootstrap_arrays
         end      
     end
 
-    save('fig10_bootstrap_data.mat','ff_resp','fn_resp','cf_resp','cn_resp')
+    if save_bootstrap_array
+        save('fig10_bootstrap_data.mat','ff_resp','fn_resp','cf_resp','cn_resp');
+    end
     
 else
     load('fig10_bootstrap_data.mat');
@@ -210,7 +213,7 @@ end
 
 n_cells = 40; 
 
-N = 3e3;
+N = 1e4;
 dims = size(ff_resp);
 
 

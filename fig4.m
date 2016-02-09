@@ -4,27 +4,28 @@ function fig4()
     run_parallel = 1;
     silent = 1;
     
-    %% Create BEM unit and its antineuron
+    %% Create BEM unit and set parameters
     bem = BEMunit('silent',silent);
     bem.memory_threshold=bem.memory_threshold*0.5;
     bem.Nx = 292; bem.Ny = 292;
     bem.deg_per_pixel = 0.03;
-    bem.dx = 0.10;
+    bem.dx = 0.09;
     bem.outputNL = @(x)(x.^2);
     for j = 1:length(bem.subunits);
         bem.subunits(j).rf_params.left.f=3;
         bem.subunits(j).rf_params.right.f=3;
     end
     
+    %% Set temporal kernel properties
     bem.temporal_kernel = 'gamma-cosine';
     bem.tk.tau = 0.035;
     bem.tk.omega = 4;
-    bem.dt = 1/200;
+    bem.dt = 1/1000;
     
     bem = bem.update();
     
 
-    %% Create stimuli
+    %% Create correlated, half-matched and uncorrelated stimulus objects
     % First correlated random dot stereogram
     correlated_rds = pairedRDS(); correlated_rds.dx = bem.dx/bem.deg_per_pixel;
     correlated_rds.Nx = 292; correlated_rds.Ny = 292;
@@ -40,27 +41,29 @@ function fig4()
     all_rds = {correlated_rds,halfmatched_rds,uncorrelated_rds};
     
     %% Stimulus parameters
-    sxs = linspace(0.025,0.30,21);
+    sxs = linspace(0.025,0.30,21); % RF sizes
     densities = logspace(log10(0.04),log10(4),11);
-    freqs = [1,10:10:100];
-    duration = 10;
+    freqs = [1,10:10:100]; % dot pattern refresh rates
+    duration = 10; % stimulus duration
 
+    %% Pre-allocate space for the figure A and B matrices
     respsA = zeros(length(sxs),length(densities),3);
     respsB = zeros(length(sxs),length(freqs),3);
     
     %% 
-    N = 0; % number of images to average across
-    N_trials= 5e3; % number of trials
     bootstrap_mode = 1; % only set this to 1 if you want to save responses to disk
     
-
-        
+    % Figure A
+    N = 2e4; % number of images to average across
+    
+    % Figure B
+    N_trials= 5e3;      
+    
     %% Run simulations; iterate over all RF sizes and all densities
     for j = 1:21
         sx=bem.subunits(1).rf_params.right.sx;
         % Rescale the RF of the model units
-        bem = bem.rescale(sxs(j)/sx);
-        
+        bem = bem.rescale(sxs(j)/sx);        
         
         fprintf('%i. Running - 4a ',j);        
         for k = 1:length(densities);                        
