@@ -8,6 +8,11 @@ function fig2()
     set(gca,'xtick',[],'ytick',[],'ydir','norm','box','off','visible','off',...
         'ydir','norm');
     
+    title('Half-matched stereogram');
+    text(10,-30,'Left eye image','fontsize',16);
+    text(260,-30,'Right eye image','fontsize',16);
+    text(60,300,'Half matched stereogram','fontsize',18)
+    
     subplot(1,2,2); hold on;
     
     x = linspace(-1,1,501);
@@ -17,8 +22,8 @@ function fig2()
     plot(x,matching_computation,'-','linewidth',4,'color',[0.2,0.8,0.2]);
     plot(x,correlation_computation,'-','linewidth',4,'color',[0.2,0.2,0.8]);
     legend('Matching','Correlation','location','southeast');
-    set(gca,'xtick',-1:0.5:1,'ytick',0:0.25:1);
-    xlabel('Binocular correlation');
+    set(gca,'xtick',-1:0.5:1,'xticklabel',0:0.25:1,'ytick',0:0.25:1);
+    xlabel('Dot match level');
     ylabel('Proportion correct');
     set_plot_params(gcf)
     plot([-1,1],[0.5,0.5],'k --','linewidth',2);
