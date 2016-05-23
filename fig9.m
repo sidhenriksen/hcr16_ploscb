@@ -1,25 +1,27 @@
-clear all;
+ clear all;
 
 %% Define run-time parameters
 % If you want to save the responses to disk (note: this takes up some
 % space)
-run_bootstrap = 0;
-build_bootstrap_arrays = 1;
+run_bootstrap = 1;
+build_bootstrap_arrays = 0;
 bootstrap_mode = 1;
 
-save_bootstrap_array = 0;
+save_bootstrap_array = 1;
 
 
 %% Define the parameters of the mother BEMunit; all the other energy model
 %% units are derived from this  mother unit.
 silent = 1;
-bem = BEMunit('silent',silent,'x0',0,'y0',0);
+bem = BEMunit('silent',silent,'x0',0,'y0',0,'bootstrap_dir','/sid/Modelling/hcr16_ploscb/fig9_data/');
 bem.Nx = 292; bem.Ny=292;
 bem.deg_per_pixel = 0.03;
 bem.temporal_kernel = 'gamma-cosine';
+%bem.temporal_kernel = 'gaussian';
 bem.outputNL = @(x)(x.^2); % squaring output nonlinearity
 
 % Set temporal properties of bem unit
+%bem.tk.tau=0.015;
 bem.tk.tau = 0.035;
 bem.tk.omega = 4;
 bem.dt = 0.001;
@@ -84,7 +86,7 @@ nt = round(duration/bem.dt); % number of time points
 %% number of dynamic RDS responses very quickly
 if run_bootstrap
     run_parallel = 1;
-    n_bootstrap = 2e4; % this many samples to save        
+    n_bootstrap = 5e3; % this many samples to save        
     
     for j = 1:length(correlation_levels);
         rds.correlation = correlation_levels(j);
@@ -99,11 +101,13 @@ if run_bootstrap
                 n_temp = 0;
             end
             if n_temp < n_bootstrap
-                Nb = n_bootstrap-n_temp;                                
+                Nb = n_bootstrap-n_temp;
+                
                 fine_far_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel);
                 fine_near_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel);
                 coarse_far_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel);
                 coarse_near_bem.simulate_spatial(rds,Nb,bootstrap_mode,run_parallel);
+                
             end
         end
         
@@ -177,7 +181,7 @@ if build_bootstrap_arrays
                 
             end
             
-            parfor k = 1:(M*n_cells)
+            for k = 1:(M*n_cells)
                 C = compute_alternating(cbem,acbem,duration,freq,alternation_rate)./norm_consts(i);
                 Cn = zeros(1,length(noise_levels));
 
@@ -213,7 +217,7 @@ end
 
 n_cells = 40; 
 
-N = 1e4;
+N = 2e4;
 dims = size(ff_resp);
 
 
@@ -255,14 +259,50 @@ fprintf('Done.\n');
 
 
 PsiM = (Psi(:,:,1)+(1-Psi(:,:,2)))/2;
-figure();
-imagesc(PsiM);
+% figure();
+% imagesc(PsiM);
 
-k = 9;
-fig = alternating_psych_analysis();
-subplot(1,2,1); hold on;
-a=plot(log(alternation_rates),PsiM(k,:),'o m -','linewidth',4,'markersize',10);
-children=get(gcf,'children');
-leg=children(1);
+
+
+[fig,alt_data] = alternating_psych_analysis();
+PsiHumans = squeeze(mean(alt_data(3:end,:),2))';
+bigPsiHumans = repmat(PsiHumans,size(PsiM,1),1);
+SS = sum( (bigPsiHumans-PsiM).^2,2);
+[~,k] = min(SS);
+
+
+uiopen('fig9.fig',1);
+fig=gcf;
+ax=get(fig,'children');
+b=get(ax(2),'children');
+m1 = b(1);
+%myleg=copyobj(ax(1),fig);
+
+
+subplot(1,2,1); 
+ax2=axes('Position',get(ax(2),'Position'),'xlim',...
+    get(ax(2),'xlim'),'ylim',get(ax(2),'ylim'),...
+    'color','none','visible','off');
+hold on;
+m2=plot(log(alternation_rates),PsiM(k,:),'o m :','linewidth',3,'markersize',8);
+
 subplot(1,2,2); hold on;
-plot(log(alternation_rates),PsiM(k,:),'o m -','linewidth',4,'markersize',10);
+plot(log(alternation_rates),PsiM(k,:),'o m :','linewidth',3,'markersize',8);
+
+
+m3=copyobj(m1,ax2);
+leg2=legend([m2,m3],'Model (LP)','Model (BP)');
+set(leg2,'box','off');
+set_plot_params(gcf,'labels','off')
+
+
+
+
+
+% subplot(1,2,1); hold on;
+% a=plot(log(alternation_rates),PsiM(k,:),'o m -','linewidth',4,'markersize',10);
+% children=get(gcf,'children');
+% leg=children(1);
+% subplot(1,2,2); hold on;
+% plot(log(alternation_rates),PsiM(k,:),'o m -','linewidth',4,'markersize',10);
+% 
